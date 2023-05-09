@@ -23,7 +23,8 @@ session_start();
 if (estAuthentifie()){
     // redirection vers la page précédente
     if(isset($_SERVER['HTTP_REFERER'])){
-        header($_SERVER['HTTP_REFERER']);
+        header('Location: ' . $_SERVER['HTTP_REFERER']);
+        exit();
     }
 
     // redirection vers la page menu.php sinon
@@ -81,7 +82,7 @@ function affFormulaireL(?bool $err): void {
             '<p>Pour vous authentifier, merci de fournir les informations suivantes. </p>';
 
     if ($err) {
-        echo '<div class="error">Echec d\'authentification. Utilisateur inconnu ou mot de passe incorrect.';
+        echo '<div class="error">Echec d\'authentification. Utilisateur inconnu ou mot de passe incorrect.</div>';
     }
 
 
@@ -130,7 +131,7 @@ function traitementConnexionL(): bool {
     /* Toutes les erreurs détectées qui nécessitent une modification du code HTML sont considérées comme des tentatives de piratage 
     et donc entraînent l'appel de la fonction sessionExit() */
 
-    if( !parametresControle('post', ['login', 'passe'])) {
+    if(!parametresControle('post', ['login', 'passe', 'btnConnexion'])) {
         sessionExit();   
     }
 
@@ -157,8 +158,6 @@ function traitementConnexionL(): bool {
     // récupération du mot de passe
     $passe = $_POST['passe'];
 
-    $ID = null;
-
     // ouverture de la connexion à la base 
     $bd = bdConnect();
 
@@ -170,29 +169,27 @@ function traitementConnexionL(): bool {
 
     while($tab = mysqli_fetch_assoc($res)) {
         if ($tab['usLogin'] == $login){
-            if(!password_verify($passe, $tab['usPasse'])){
+            if(password_verify($passe, $tab['usPasse'])){
+                $ID = $tab['usID'];
+            } else {
                 $erreurs = true;
             }
         } else {
             $erreurs = true;
         }
-        $ID = $tab['usID'];
     }
     mysqli_free_result($res);
+    // fermeture de la connexion à la base de données
+    mysqli_close($bd);
 
     // si erreurs --> retour
     if ($erreurs) {
-        // fermeture de la connexion à la base de données
-        mysqli_close($bd);
         return $erreurs;   //===> FIN DE LA FONCTION
     }
      
     // mémorisation de l'ID dans une variable de session
     // cette variable de session permet de savoir si l'utilisateur est authentifié
     $_SESSION['usID'] = $ID;
-
-    // fermeture de la connexion à la base de données
-    mysqli_close($bd);
 
     // mémorisation du login dans une variable de session (car affiché dans la barre de navigation sur toutes les pages)
     // enregistrement dans la variable de session du login avant passage par la fonction mysqli_real_escape_string()
@@ -202,7 +199,8 @@ function traitementConnexionL(): bool {
 
     // redirection vers la page précédente
     if(isset($_SERVER['HTTP_REFERER'])){
-        header($_SERVER['HTTP_REFERER']);
+        header('Location: ' . $_SERVER['HTTP_REFERER']);
+        exit();
     }
 
     // redirection vers la page menu.php sinon

@@ -10,7 +10,8 @@ sessionExit();
 
 // redirection vers la page précédente
 if(isset($_SERVER['HTTP_REFERER'])){
-    header($_SERVER['HTTP_REFERER']);
+    header('Location: ' . $_SERVER['HTTP_REFERER']);
+    exit();
 }
 
 // redirection vers la page menu.php
