@@ -10,6 +10,8 @@ ob_start();
 // démarrage ou reprise de la session
 session_start();
 
+$_SESSION['back'] = $_SERVER['REQUEST_URI'];
+
 // affichage de l'entête
 affEntete('Menus et repas');
 // affichage de la barre de navigation
@@ -267,4 +269,58 @@ function affContenuL(): void {
         echo '</section>';
     }
 
+}
+
+//_______________________________________________________________
+/**
+ * Génère un commentaire.
+ * 
+ * @param com       la chaine du commentaire
+ * @param nom       le nom de l'usager ayant commenté
+ * @param prenom    le prenom de l'usager ayant commenté
+ * @param date      la date formatté de la publication du commentaire
+ * @param src       la source de l'image uploadée
+ * @param note      la note sur cinq attribuée au commentaire 
+ *
+ * @return void
+ */
+function affCom(string $com, string $nom, string $prenom, string $date ,string $src, int $note ): void {
+    echo
+    '<div class="commentaireRepas">',
+        '<img alt="screenshotRepas" src="'.$src.'">',
+        '<p><strong>Commentaire de '.$prenom.' '.$nom.', publié le '.$date.'</strong><p>',
+        '<p class="commentaire">'.$com.'</p>',
+        '<p>Note : '.$note.' / 5</p>',
+    '</div>'
+    ;
+}
+
+//_______________________________________________________________
+/**
+ * Génère tous les commentaires.
+ * 
+ * @param liCom     la liste des commentaires sous la forme
+ *                      $liCom[0] = {
+ *                          'com' = le commentaire,
+ *                          'nom' = le nom
+ *                           etc... (cf fonction affCom)             
+ *                      }
+ *
+ * @return void
+ */
+function affComs(array $liCom, int $moyenne): void {
+    echo 
+        '<div class="Commentaires">',
+        '<h4>Commentaires sur ce menu</h4>',
+        '<br>',
+        '<p>Note moyenne de ce menu : '.$moyenne.'/5 sur la base de '.sizeof($liCom).' commentaires</p>'
+    ;
+
+    foreach($licom as $commentaire){
+        affCom($commentaire['com'], $commentaire['nom'], $commentaire['prenom'], $commentaire['date'], $commentaire['src'], $commentaire['note']);
+    }
+
+    echo 
+        '</div>'
+    ;
 }

@@ -22,7 +22,11 @@ session_start();
 // si l'utilisateur est déjà authentifié
 if (estAuthentifie()){
     // redirection vers la page précédente
-    echo '<script>window.history.back();</script>';
+    if(isset($_SESSION['back'])){
+        header('Location: ' . $_SESSION['back']);
+        exit();
+    }
+    header('Location: menu.php');
     exit();
 }
 
@@ -164,7 +168,9 @@ function traitementConnexionL(): bool {
     while($tab = mysqli_fetch_assoc($res)) {
         if ($tab['usLogin'] == $login){
             if(password_verify($passe, $tab['usPasse'])){
-                $ID = $tab['usID'];
+                // mémorisation de l'ID dans une variable de session
+                // cette variable de session permet de savoir si l'utilisateur est authentifié
+                $_SESSION['usID'] = $tab['usID'];
             } else {
                 $erreurs = true;
             }
@@ -172,6 +178,7 @@ function traitementConnexionL(): bool {
             $erreurs = true;
         }
     }
+
     mysqli_free_result($res);
     // fermeture de la connexion à la base de données
     mysqli_close($bd);
@@ -180,10 +187,6 @@ function traitementConnexionL(): bool {
     if ($erreurs) {
         return $erreurs;   //===> FIN DE LA FONCTION
     }
-     
-    // mémorisation de l'ID dans une variable de session
-    // cette variable de session permet de savoir si l'utilisateur est authentifié
-    $_SESSION['usID'] = $ID;
 
     // mémorisation du login dans une variable de session (car affiché dans la barre de navigation sur toutes les pages)
     // enregistrement dans la variable de session du login avant passage par la fonction mysqli_real_escape_string()
@@ -192,6 +195,10 @@ function traitementConnexionL(): bool {
     $_SESSION['usLogin'] = $login;
 
     // redirection vers la page précédente
-    echo '<script>window.history.back();</script>';
+    if(isset($_SESSION['back'])){
+        header('Location: ' . $_SESSION['back']);
+        exit();
+    }
+    header('Location: menu.php');
     exit(); //===> Fin du script
 }

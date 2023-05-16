@@ -9,6 +9,8 @@ ob_start();
 
 session_start();
 
+$_SESSION['back'] = $_SERVER['REQUEST_URI'];
+
 // génération de l'entête 
 affEntete('Accueil', prefixe:'.');
 // génération du menu (connecté ou pas)

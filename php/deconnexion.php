@@ -6,7 +6,8 @@ require_once 'bibli_erestou.php';
 // pas besoin de démarrer la bufferisation des sorties
 session_start();
 
+if(isset($_SESSION['back'])){
+    sessionExit($_SESSION['back']);
+    exit();
+}
 sessionExit();
-
-// redirection vers la page précédente
-echo '<script>window.history.back();</script>';
