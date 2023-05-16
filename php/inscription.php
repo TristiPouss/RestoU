@@ -21,7 +21,7 @@ session_start();
 
 // si l'utilisateur est déjà authentifié
 if (estAuthentifie()){
-    header ('Location: menu.php');
+    echo '<script>window.history.back();</script>';
     exit();
 }
 
@@ -263,7 +263,7 @@ function traitementInscriptionL(): array {
     // Rappel : ici, elle ne rajoutera jamais d'antislash car le login ne peut contenir que des caractères alphanumériques
     $_SESSION['usLogin'] = $login;
 
-    // redirection vers la page menu.php
-    header('Location: menu.php');
+    // redirection vers la page precedente
+    echo '<script>window.history.back();</script>';
     exit(); //===> Fin du script
 }

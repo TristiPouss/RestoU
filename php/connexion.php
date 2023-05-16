@@ -22,13 +22,7 @@ session_start();
 // si l'utilisateur est déjà authentifié
 if (estAuthentifie()){
     // redirection vers la page précédente
-    if(isset($_SERVER['HTTP_REFERER'])){
-        header('Location: ' . $_SERVER['HTTP_REFERER']);
-        exit();
-    }
-
-    // redirection vers la page menu.php sinon
-    header('Location: menu.php');
+    echo '<script>window.history.back();</script>';
     exit();
 }
 
@@ -114,8 +108,8 @@ function affFormulaireL(?bool $err): void {
  * Vérification de la validité des données
  * Si on trouve des erreurs => return un tableau les contenant
  * Sinon
- *     Enregistrement du nouvel inscrit dans la base
- *     Ouverture de la session et redirection vers la page protegee.php
+ *     Connexion de l'utilisateur
+ *     Ouverture de la session et redirection vers la page precedente
  * FinSi
  * Toutes les erreurs détectées qui nécessitent une modification du code HTML sont considérées comme des tentatives de piratage
  * et donc entraînent l'appel de la fonction em_sessionExit() sauf :
@@ -198,12 +192,6 @@ function traitementConnexionL(): bool {
     $_SESSION['usLogin'] = $login;
 
     // redirection vers la page précédente
-    if(isset($_SERVER['HTTP_REFERER'])){
-        header('Location: ' . $_SERVER['HTTP_REFERER']);
-        exit();
-    }
-
-    // redirection vers la page menu.php sinon
-    header('Location: menu.php');
+    echo '<script>window.history.back();</script>';
     exit(); //===> Fin du script
 }
