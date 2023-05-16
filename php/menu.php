@@ -151,9 +151,8 @@ function bdMenuL(int $date, array &$menu) : bool {
         return false; // ==> fin de la fonction bdMenuL()
     }
 
-
     // tableau associatif contenant les constituants du menu : un élément par section
-    $menu = array(  'entrees'           => array(),
+    $choix = array(  'entrees'           => array(),
                     'plats'             => array(),
                     'accompagnements'   => array(),
                     'desserts'          => array(),
@@ -176,6 +175,73 @@ function bdMenuL(int $date, array &$menu) : bool {
             case 'dessert':
             case 'fromage':
                 $menu['desserts'][] = $tab;
+                break;
+            default:
+                $menu['boissons'][] = $tab;
+        }
+    }
+    // libération des ressources
+    mysqli_free_result($res);
+    // fermeture de la connexion au serveur de base de  données
+    mysqli_close($bd);
+    return true;
+}
+//_______________________________________________________________
+/**
+ * Récupération du choix de la date affichée
+ *
+ * @param int       $date           date affichée
+ * @param array     $choix          choix effectué de la date affichée
+ * 
+ * @return bool                     true si un choix a été fait, false sinon
+ */
+function getChoixUser(int $date, array &$choix) : bool {
+
+    // ouverture de la connexion à la base de données
+    $bd = bdConnect();
+    $userID=$_SESSION['usID'];
+    // Récupération des plats qui sont proposés pour le menu (boissons incluses, divers exclus)
+    $sql = "SELECT rePlat, plNom, plCategorie
+            FROM repas INNER JOIN plat ON (plID=rePlat AND reDate=$date AND reUsager=$userID) WHERE plCategorie = 'divers'";
+
+    // envoi de la requête SQL
+    $res = bdSendRequest($bd, $sql);
+
+    // Quand le resto U est fermé, la requête précédente renvoie tous les enregistrements de la table Plat de
+    // catégorie boisson : il y en a NB_CAT_BOISSON
+    if (mysqli_num_rows($res) <= 0) {
+        // libération des ressources
+        mysqli_free_result($res);
+        // fermeture de la connexion au serveur de base de  données
+        mysqli_close($bd);
+        return false; // ==> fin de la fonction bdMenuL()
+    }
+
+
+    // tableau associatif contenant les constituants du menu : un élément par section
+    $choix = array(  'entrees'           => array(),
+                    'plats'             => array(),
+                    'accompagnements'   => array(),
+                    'desserts'          => array(),
+                    'boissons'          => array()
+                );
+
+    // parcours des ressources :
+    while ($tab = mysqli_fetch_assoc($res)) {
+        switch ($tab['plCategorie']) {
+            case 'entree':
+                $choix['entrees'][] = $tab;
+                break;
+            case 'viande':
+            case 'poisson':
+                $choix['plats'][] = $tab;
+                break;
+            case 'accompagnement':
+                $choix['accompagnements'][] = $tab;
+                break;
+            case 'dessert':
+            case 'fromage':
+                $choix['desserts'][] = $tab;
                 break;
             default:
                 $menu['boissons'][] = $tab;
@@ -221,6 +287,41 @@ function affPlatL(array $p, string $catAff): void {
 
 //_______________________________________________________________
 /**
+ * Affichage d'un des constituants du menu.
+ *
+ * @param  array       $p      tableau associatif contenant les informations du plat en cours d'affichage
+ * @param  array       $choix  tableau des choix de l'utilisateur
+ * @param  string      $catAff catégorie d'affichage du plat
+ *
+ * @return void
+ */
+function affPlatLChecked(array $p, array $choix,string $catAff): void {
+    if ($catAff != 'accompagnements'){ //radio bonton
+        $name = "rad$catAff";
+        $id = "{$name}{$p['plID']}";
+        $type = 'radio';
+    }
+    else{ //checkbox
+        $id = $name = "cb{$p['plID']}";
+        $type = 'checkbox';
+    }
+
+    // protection des sorties contre les attaques XSS
+    $choix[$catAff] = htmlProtegerSorties($p[$catAff]);
+    
+    $p['plNom'] = htmlProtegerSorties($p['plNom']);
+    $checked = ($choix[$catAff] == $p['plID']) ? "checked" : "";
+
+    echo    '<input id="', $id, '" name="', $name, '" type="', $type, '" value="', $p['plID'], '" disabled ',$checked,'>',
+            '<label for="', $id,'">',
+                '<img src="../images/repas/', $p['plID'], '.jpg" alt="', $p['plNom'], '" title="', $p['plNom'], '">',
+                $p['plNom'], '<br>', '<span>', $p['plCarbone'],'kg eqCO2 / ', $p['plCalories'], 'kcal</span>',
+            '</label>';
+
+}
+
+//_______________________________________________________________
+/**
  * Génère le contenu de la page.
  *
  * @return void
@@ -228,7 +329,6 @@ function affPlatL(array $p, string $catAff): void {
 function affContenuL(): void {
 
     $date = dateConsulteeL();
-
     // si dateConsulteeL() renvoie une erreur
     if (is_string($date)){
         echo    '<h4 class="center nomargin">Erreur</h4>',
@@ -245,6 +345,9 @@ function affContenuL(): void {
     // menu du jour
     $menu = [];
 
+    // choix du jour
+    $choix = [];
+
     $restoOuvert = bdMenuL($date, $menu);
 
     if (! $restoOuvert){
@@ -252,6 +355,8 @@ function affContenuL(): void {
         return; // ==> fin de la fonction affContenuL()
     }
     
+    $choixFait = getChoixUser($date,$choix);
+
     // titre h3 des sections à afficher
     $h3 = array('entrees'           => 'Entrée',
                 'plats'             => 'Plat', 
@@ -261,14 +366,22 @@ function affContenuL(): void {
                 );
     
     // affichage du menu
+    $compdate = compareDate($date,DATE_AUJOURDHUI);
+
     foreach($menu as $key => $value){
         echo '<section class="bcChoix"><h3>', $h3[$key], '</h3>';
-        foreach ($value as $p) {
-            affPlatL($p, $key);
+        if (!estAuthentifie() || ($compdate>0) || (estAuthentifie()&& !$choixFait && $compdate<0)){
+            foreach ($value as $p) {
+                affPlatL($p, $key);
+            }
+        }
+        if (estAuthentifie() && $choixFait){
+            foreach ($value as $p){
+                affPlatLChecked($p,$choix,$key);
+            }
         }
         echo '</section>';
     }
-
 }
 
 //_______________________________________________________________

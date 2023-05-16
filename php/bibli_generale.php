@@ -289,6 +289,20 @@ function getJourMoisAnneeFromDate(int $date) : array{
     return $t;
 }
 
+
+//___________________________________________________________________
+/**
+ * Renvoie un entier indiquant si la date1 est inférieur (renvoie un négatif), égale (renvoie 0) ou supérieur (renvoie un positif)
+ *
+ * @param int       $date1   La date au format AAAAMMJJ
+ * @param int       $date2   La date au format AAAAMMJJ
+ * 
+ * @return int            Tableau contenant le jour, le mois et l'année
+ */
+function compareDate(int $date1, int $date2):int{
+    return $date1 - $date2;
+}
+
 //_______________________________________________________________
 /**
  *  Protection des sorties (code HTML généré à destination du client).
