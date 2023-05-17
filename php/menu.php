@@ -382,29 +382,44 @@ function affContenuL(): void {
         }
         echo '</section>';
     }
+
+    // affichage des commentaires
+    affComs(getCom($date), getMoy($date));
 }
 
 //_______________________________________________________________
 /**
  * Génère un commentaire.
  * 
+ * @param ID        l'Identifiant de la personne ayant commenté
+ * @param dateRepas la date du repas
  * @param com       la chaine du commentaire
  * @param nom       le nom de l'usager ayant commenté
  * @param prenom    le prenom de l'usager ayant commenté
  * @param date      la date formatté de la publication du commentaire
- * @param src       la source de l'image uploadée
  * @param note      la note sur cinq attribuée au commentaire 
  *
  * @return void
  */
-function affCom(string $com, string $nom, string $prenom, string $date ,string $src, int $note ): void {
+function affCom(string $ID, string $dateRepas, string $com, string $nom, string $prenom, string $date, string $note): void {
+    $src = "../upload/{$dateRepas}_{$ID}.jpg";
+
+    list($jour, $mois, $annee) = getJourMoisAnneeFromDate($dateRepas);
+    $min = substr($date, -2);
+    $heure = substr($date, -4, -2);
+
     echo
-    '<div class="commentaireRepas">',
-        '<img alt="screenshotRepas" src="'.$src.'">',
-        '<p><strong>Commentaire de '.$prenom.' '.$nom.', publié le '.$date.'</strong><p>',
+    '<article>';
+    if(file_exists($src)){
+        echo
+        '<img alt="screenshotRepas" src="'.$src.'">'
+        ;
+    }
+    echo
+        '<p><strong>Commentaire de '.$prenom.' '.$nom.', publié le '.$jour.' '.moisStr($mois).' '.$annee.' à '.$heure.':'.$min.'</strong><p>',
         '<p class="commentaire">'.$com.'</p>',
         '<p>Note : '.$note.' / 5</p>',
-    '</div>'
+    '</article>'
     ;
 }
 
@@ -413,27 +428,126 @@ function affCom(string $com, string $nom, string $prenom, string $date ,string $
  * Génère tous les commentaires.
  * 
  * @param liCom     la liste des commentaires sous la forme
+ *                  d'un tableau de tableaux de commentaires :
  *                      $liCom[0] = {
  *                          'com' = le commentaire,
  *                          'nom' = le nom
  *                           etc... (cf fonction affCom)             
  *                      }
+ * @param moyenne   moyenne des commentaires
  *
  * @return void
  */
 function affComs(array $liCom, int $moyenne): void {
+    $size = sizeof($liCom);
+
     echo 
         '<div class="Commentaires">',
         '<h4>Commentaires sur ce menu</h4>',
-        '<br>',
-        '<p>Note moyenne de ce menu : '.$moyenne.'/5 sur la base de '.sizeof($liCom).' commentaires</p>'
-    ;
-
-    foreach($licom as $commentaire){
-        affCom($commentaire['com'], $commentaire['nom'], $commentaire['prenom'], $commentaire['date'], $commentaire['src'], $commentaire['note']);
+        '<br>';
+    if($size != 0){
+        echo '<p>Note moyenne de ce menu : '.$moyenne.' / 5 sur la base de '.$size.' commentaire'.plural($size).'</p>';
+        foreach($liCom as $commentaire){
+            affCom($commentaire['ID'], $commentaire['dateRepas'], htmlspecialchars($commentaire['com'], ENT_QUOTES, 'UTF-8'), $commentaire['nom'], $commentaire['prenom'], $commentaire['date'], $commentaire['note']);
+        }
+    } else {
+        echo '<p>Aucun commentaire pour l\'instant.</i></p>';
     }
-
-    echo 
-        '</div>'
-    ;
+    echo '</div>';
 }
+
+//_______________________________________________________________
+/**
+ * Récupère tous les commentaires dans la base de données.
+ * 
+ * @param date      la date actuelle sous forme d'entier au format AAAAMMJJ
+ * 
+ * @return array    la liste des commentaires 
+ */
+function getCom(int $date): array {
+    $liCom = array();
+
+    // ouverture de la connexion à la base 
+    $bd = bdConnect();
+
+    $sql = "SELECT usID, coDateRepas, coTexte, coDatePublication, coNote, usNom, usPrenom
+            FROM commentaire INNER JOIN usager ON coUsager = usID 
+            WHERE coDateRepas = '{$date}'";
+    $res = bdSendRequest($bd, $sql);
+
+    while($tab = mysqli_fetch_assoc($res)) {
+        $commentaire = array();
+
+        $commentaire['ID'] = $tab['usID'];
+        $commentaire['dateRepas'] = $tab['coDateRepas'];
+        $commentaire['com'] = $tab['coTexte']; 
+        $commentaire['date'] = $tab['coDatePublication'];
+        $commentaire['note'] = $tab['coNote'];
+        $commentaire['nom'] = $tab['usNom'];
+        $commentaire['prenom'] = $tab['usPrenom'];
+
+        array_push($liCom, $commentaire);
+    }
+    mysqli_free_result($res);
+
+    // fermeture de la connexion à la base de données
+    mysqli_close($bd);
+
+    return $liCom;
+}
+
+//_______________________________________________________________
+/**
+ * Récupère la moyenne des commentaires d'un jour donné.
+ * 
+ * @param date      la date actuelle sous forme d'entier au format AAAAMMJJ
+ * 
+ * @return float      la moyenne (0 si aucun commentaires (ou si la moyenne est vraiment 0))
+ */
+function getMoy(int $date): float {
+    $moy = 0.0;
+
+    // ouverture de la connexion à la base 
+    $bd = bdConnect();
+
+    $sql = "SELECT AVG(coNote) AS avg
+            FROM commentaire WHERE coDateRepas = '{$date}'";
+    $res = bdSendRequest($bd, $sql);
+
+    $tab = mysqli_fetch_assoc($res);
+    if($tab['avg'] != null){
+        $moy = $tab['avg'];
+    }
+    mysqli_free_result($res);
+
+    // fermeture de la connexion à la base de données
+    mysqli_close($bd);
+
+    return round($moy, 1);
+}
+
+/* Indications sur les commentaires
+
+Chaque commentaire est associé à un repas pris par un utilisateur : 
+pour pouvoir commenter un menu, il faut l'avoir préalablement commandé.
+
+Un commentaire est constitué d'un texte et d'une note entière sur 5, 
+
+et peut être illustré par une image uploadée sur le serveur. 
+Celle-ci est donc située dans un dossier particulier nommé upload, 
+et est nommée à partir de la date du repas pris et commenté 
+(champ "coDateRepas" de la table commentaire) et de l'identifiant de l'usager auteur 
+du commentaire (champ "coUsager" de la table commentaire), au format coDateRepas_coUsager.jpg. 
+Par exemple, l'image illustrant le commentaire du repas pris par l'usager, d'identifiant 2, le 7 mars 2023 est nommée 20230307_2.jpg.
+
+La page menu.php doit permettre de visualiser les éventuels commentaires portant sur ce menu (cf. TP2). 
+Si la date consultée est antérieure ou égale à la date courante ou actuelle (et uniquement dans ce cas), 
+et qu'il n'y a pas de commentaires portant sur ce menu, un message doit l'indiquer.
+N.B. : les menus des dates postérieures à la date actuelle ne peuvent pas, 
+par définition, avoir été déjà commandés. Donc, ils ne peuvent pas avoir été déjà commentés. 
+Par conséquent, dans ce cas, il ne faut pas afficher un message indiquant que le menu n'a pas été commenté.
+
+Les commentaires d'un repas sont affichés du plus récent au plus ancien.
+
+S'il y a un ou plusieurs commentaires, un message informe de la note moyenne donnée dans les commentaires, 
+arrondie au dixième, et indique le nombre de commentaires.*/
