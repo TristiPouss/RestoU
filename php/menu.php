@@ -196,10 +196,15 @@ function bdMenuL(int $date, array &$menu) : bool {
  * @return bool                     true si un choix a été fait, false sinon
  */
 function getChoixUser(int $date, array &$choix) : bool {
+    if(isset($_SESSION['usID'])){
+        $userID = $_SESSION['usID'];
+    }else{
+        return false;
+    }
 
     // ouverture de la connexion à la base de données
     $bd = bdConnect();
-    $userID=$_SESSION['usID'];
+
     // Récupération des plats qui sont proposés pour le menu (boissons incluses, divers exclus)
     $sql = "SELECT rePlat, plNom, plCategorie
             FROM repas INNER JOIN plat ON (plID=rePlat AND reDate=$date AND reUsager=$userID) WHERE plCategorie = 'divers'";
@@ -219,7 +224,7 @@ function getChoixUser(int $date, array &$choix) : bool {
 
 
     // tableau associatif contenant les constituants du menu : un élément par section
-    $choix = array(  'entrees'           => array(),
+    $choix = array( 'entrees'           => array(),
                     'plats'             => array(),
                     'accompagnements'   => array(),
                     'desserts'          => array(),
@@ -367,7 +372,6 @@ function affContenuL(): void {
     
     // affichage du menu
     $compdate = compareDate($date,DATE_AUJOURDHUI);
-    var_dump($compdate);
 
     foreach($menu as $key => $value){
         echo '<section class="bcChoix"><h3>', $h3[$key], '</h3>';
@@ -444,15 +448,21 @@ function affCom(string $ID, string $dateRepas, string $com, string $nom, string 
  */
 function affComs(array $liCom, float $moyenne): void {
     $size = sizeof($liCom);
+    
+    if (floor($moyenne) == $moyenne){
+        $moyenne = number_format($moyenne, 0);
+    }else{
+        $moyenne = number_format($moyenne, 1, ',');
+    }
 
     echo 
         '<div class="Commentaires">',
         '<h4>Commentaires sur ce menu</h4>',
         '<br>';
     if($size > 0){
-        if($size > 1){
-            echo '<p>Note moyenne de ce menu : '.number_format($moyenne,1,',').' / 5 sur la base de '.$size.' commentaires</p>';
-        }
+        echo '<p>Note moyenne de ce menu : '.$moyenne.' / 5 sur la base de '.$size.' commentaire';
+        if($size > 1){echo 's';}
+        echo '</p>';
         foreach($liCom as $commentaire){
             // on protege seulement le texte du commentaire, 
             // le reste a soit deja ete verifie soit est issu de la BD
@@ -487,7 +497,7 @@ function getCom(int $date): array {
 
     $sql = "SELECT usID, coDateRepas, coTexte, coDatePublication, coNote, usNom, usPrenom
             FROM commentaire INNER JOIN usager ON coUsager = usID 
-            WHERE coDateRepas = '{$date}'";
+            WHERE coDateRepas = '{$date}' ORDER BY coDateRepas DESC";
     $res = bdSendRequest($bd, $sql);
 
     while($tab = mysqli_fetch_assoc($res)) {
