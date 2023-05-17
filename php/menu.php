@@ -367,6 +367,7 @@ function affContenuL(): void {
     
     // affichage du menu
     $compdate = compareDate($date,DATE_AUJOURDHUI);
+    var_dump($compdate);
 
     foreach($menu as $key => $value){
         echo '<section class="bcChoix"><h3>', $h3[$key], '</h3>';
@@ -384,7 +385,9 @@ function affContenuL(): void {
     }
 
     // affichage des commentaires
-    affComs(getCom($date), getMoy($date));
+    if($compdate < 1){
+        affComs(getCom($date), getMoy($date));
+    }
 }
 
 //_______________________________________________________________
@@ -427,8 +430,9 @@ function affCom(string $ID, string $dateRepas, string $com, string $nom, string 
 /**
  * Génère tous les commentaires.
  * 
- * @param liCom     la liste des commentaires sous la forme
- *                  d'un tableau de tableaux de commentaires :
+ * @param liCom     liste des commentaires sous la forme
+ *                  d'un tableau de tableaux de commentaires 
+ *                  Exemple :
  *                      $liCom[0] = {
  *                          'com' = le commentaire,
  *                          'nom' = le nom
@@ -438,17 +442,28 @@ function affCom(string $ID, string $dateRepas, string $com, string $nom, string 
  *
  * @return void
  */
-function affComs(array $liCom, int $moyenne): void {
+function affComs(array $liCom, float $moyenne): void {
     $size = sizeof($liCom);
 
     echo 
         '<div class="Commentaires">',
         '<h4>Commentaires sur ce menu</h4>',
         '<br>';
-    if($size != 0){
-        echo '<p>Note moyenne de ce menu : '.$moyenne.' / 5 sur la base de '.$size.' commentaire'.plural($size).'</p>';
+    if($size > 0){
+        if($size > 1){
+            echo '<p>Note moyenne de ce menu : '.number_format($moyenne,1,',').' / 5 sur la base de '.$size.' commentaires</p>';
+        }
         foreach($liCom as $commentaire){
-            affCom($commentaire['ID'], $commentaire['dateRepas'], htmlspecialchars($commentaire['com'], ENT_QUOTES, 'UTF-8'), $commentaire['nom'], $commentaire['prenom'], $commentaire['date'], $commentaire['note']);
+            // on protege seulement le texte du commentaire, 
+            // le reste a soit deja ete verifie soit est issu de la BD
+            affCom($commentaire['ID'], 
+                   $commentaire['dateRepas'], 
+                   htmlspecialchars($commentaire['com'], ENT_QUOTES, 'UTF-8'), 
+                   $commentaire['nom'], 
+                   $commentaire['prenom'], 
+                   $commentaire['date'], 
+                   $commentaire['note']
+            );
         }
     } else {
         echo '<p>Aucun commentaire pour l\'instant.</i></p>';
@@ -502,7 +517,7 @@ function getCom(int $date): array {
  * 
  * @param date      la date actuelle sous forme d'entier au format AAAAMMJJ
  * 
- * @return float      la moyenne (0 si aucun commentaires (ou si la moyenne est vraiment 0))
+ * @return float    la moyenne (0 si aucun commentaires (ou si la moyenne est vraiment 0))
  */
 function getMoy(int $date): float {
     $moy = 0.0;
@@ -510,20 +525,20 @@ function getMoy(int $date): float {
     // ouverture de la connexion à la base 
     $bd = bdConnect();
 
-    $sql = "SELECT AVG(coNote) AS avg
+    $sql = "SELECT AVG(coNote) AS moy
             FROM commentaire WHERE coDateRepas = '{$date}'";
     $res = bdSendRequest($bd, $sql);
 
     $tab = mysqli_fetch_assoc($res);
-    if($tab['avg'] != null){
-        $moy = $tab['avg'];
+    if($tab['moy'] != null){
+        $moy = $tab['moy'];
     }
     mysqli_free_result($res);
 
     // fermeture de la connexion à la base de données
     mysqli_close($bd);
 
-    return round($moy, 1);
+    return $moy;
 }
 
 /* Indications sur les commentaires

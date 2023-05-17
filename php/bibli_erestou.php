@@ -231,18 +231,3 @@ function moisStr(int $mois) : string {
             return null;
     }
 } 
-
-//_______________________________________________________________
-/**
- * Renvoie un 's' si le nombre en entrée est superieur a 1
- *
- * @param n
- *
- * @return string
- */
-function plural(int $n) : string {
-    if($n > 1){
-        return 's';
-    }
-    return '';
-}
