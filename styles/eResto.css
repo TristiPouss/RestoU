@@ -593,4 +593,14 @@ form input[type=text], form input[type=email], form input[type=password] {
     list-style-type: "\1F61E";
 }
 
-
+.valid {
+    color: green;
+    font-size: 14px;
+    font-weight: bold;
+    font-display: center;
+    width: 85%;
+    margin: 10px auto;
+    border: solid 2px green;
+    padding: 5px;
+    line-height: 1.5;
+}

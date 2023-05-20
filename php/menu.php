@@ -14,11 +14,21 @@ $_SESSION['back'] = $_SERVER['REQUEST_URI'];
 
 // affichage de l'entête
 affEntete('Menus et repas');
+
 // affichage de la barre de navigation
 affNav();
 
+// enregistrement de la commande si elle existe
+if(isset($_POST['btnCommander'])){
+    $erreurs = verifCommande();
+} else {
+    $erreurs = null;
+}
+
+var_dump($_POST);
+
 // contenu de la page 
-affContenuL();
+affContenuL($erreurs);
 
 // affichage du pied de page
 affPiedDePage();
@@ -196,24 +206,23 @@ function bdMenuL(int $date, array &$menu) : bool {
  * @return bool                     true si un choix a été fait, false sinon
  */
 function getChoixUser(int $date, array &$choix) : bool {
-    if(isset($_SESSION['usID'])){
-        $userID = $_SESSION['usID'];
-    }else{
+    if(!isset($_SESSION['usID'])){
         return false;
     }
+    
+    $userID = $_SESSION['usID'];
 
     // ouverture de la connexion à la base de données
     $bd = bdConnect();
 
     // Récupération des plats qui sont proposés pour le menu (boissons incluses, divers exclus)
     $sql = "SELECT rePlat, plNom, plCategorie
-            FROM repas INNER JOIN plat ON (plID=rePlat AND reDate=$date AND reUsager=$userID) WHERE plCategorie = 'divers'";
+            FROM repas INNER JOIN plat ON (plID=rePlat AND reDate=$date AND reUsager=$userID) WHERE plCategorie != 'divers'";
 
     // envoi de la requête SQL
     $res = bdSendRequest($bd, $sql);
 
-    // Quand le resto U est fermé, la requête précédente renvoie tous les enregistrements de la table Plat de
-    // catégorie boisson : il y en a NB_CAT_BOISSON
+    // Pas de repas commandé à cette date
     if (mysqli_num_rows($res) <= 0) {
         // libération des ressources
         mysqli_free_result($res);
@@ -269,7 +278,7 @@ function getChoixUser(int $date, array &$choix) : bool {
  * @return void
  */
 function affPlatL(array $p, string $catAff): void {
-    if ($catAff != 'accompagnements'){ //radio bonton
+    if ($catAff != 'accompagnements'){ //radio bouton
         $name = "rad$catAff";
         $id = "{$name}{$p['plID']}";
         $type = 'radio';
@@ -301,7 +310,7 @@ function affPlatL(array $p, string $catAff): void {
  * @return void
  */
 function affPlatLChecked(array $p, array $choix,string $catAff): void {
-    if ($catAff != 'accompagnements'){ //radio bonton
+    if ($catAff != 'accompagnements'){ //radio bouton
         $name = "rad$catAff";
         $id = "{$name}{$p['plID']}";
         $type = 'radio';
@@ -311,10 +320,9 @@ function affPlatLChecked(array $p, array $choix,string $catAff): void {
         $type = 'checkbox';
     }
 
-    // protection des sorties contre les attaques XSS
-    $choix[$catAff] = htmlProtegerSorties($p[$catAff]);
-    
+    // protection des sorties contre les attaques XSS    
     $p['plNom'] = htmlProtegerSorties($p['plNom']);
+
     $checked = ($choix[$catAff] == $p['plID']) ? "checked" : "";
 
     echo    '<input id="', $id, '" name="', $name, '" type="', $type, '" value="', $p['plID'], '" disabled ',$checked,'>',
@@ -327,11 +335,47 @@ function affPlatLChecked(array $p, array $choix,string $catAff): void {
 
 //_______________________________________________________________
 /**
- * Génère le contenu de la page.
+ * Affichage d'un des constituants du menu non désactivé.
+ *
+ * @param  array       $p      tableau associatif contenant les informations du plat en cours d'affichage
+ * @param  string      $catAff catégorie d'affichage du plat
  *
  * @return void
  */
-function affContenuL(): void {
+function affPlatFormL(array $p, string $catAff): void {
+    if ($catAff != 'accompagnements'){ //radio bouton
+        $name = "rad$catAff";
+        $id = "{$name}{$p['plID']}";
+        $type = 'radio';
+    }
+    else{ //checkbox
+        $id = $name = "cb{$p['plID']}";
+        $type = 'checkbox';
+    }
+
+    // protection des sorties contre les attaques XSS
+    $p['plNom'] = htmlProtegerSorties($p['plNom']);
+
+    $checked = (isset($_POST['btnCommander']) && $_POST[$name] == $p['plID']) ? "checked" : "";
+
+    echo    '<input id="', $id, '" name="', $name, '" type="', $type, '" value="', $p['plID'], '" ',$checked,'>',
+            '<label for="', $id,'">',
+                '<img src="../images/repas/', $p['plID'], '.jpg" alt="', $p['plNom'], '" title="', $p['plNom'], '">',
+                $p['plNom'], '<br>', '<span>', $p['plCarbone'],'kg eqCO2 / ', $p['plCalories'], 'kcal</span>',
+            '</label>';
+
+}
+
+//_______________________________________________________________
+/**
+ * Génère le contenu de la page.
+ * 
+ * @param array         $erreurs    les erreurs dans la commande, 
+ *                                  null si aucune erreur
+ *
+ * @return void
+ */
+function affContenuL(?array $erreurs): void {
 
     $date = dateConsulteeL();
     // si dateConsulteeL() renvoie une erreur
@@ -346,6 +390,11 @@ function affContenuL(): void {
     
     // Génération de la navigation entre les dates 
     affNavigationDateL($date);
+
+    if(isset($_POST['btnCommander']) && $erreurs == null){
+        //addCommande();
+        echo '<div class="valid">La commande à été enregistrée avec succès.</div>';
+    }
 
     // menu du jour
     $menu = [];
@@ -372,26 +421,189 @@ function affContenuL(): void {
     
     // affichage du menu
     $compdate = compareDate($date,DATE_AUJOURDHUI);
+    $isForm = estAuthentifie() && !$choixFait && $compdate >= 0;
+
+    if($isForm){
+        echo 
+            '<p class="notice">',
+                '<img src="../images/notice.png" alt="notice" width="50" height="48">',
+                'Tous les plateaux sont composés avec un verre, un couteau, une fouchette et une petite cuillère.',
+            '</p>',
+            '<form method="POST" action="menu.php">'
+        ;
+
+        if (is_array($erreurs)) {
+            echo    '<div class="error">Les erreurs suivantes ont été relevées lors de votre inscription :',
+                        '<ul>';
+            foreach ($erreurs as $e) {
+                echo        '<li>', $e, '</li>';
+            }
+            echo        '</ul>',
+                    '</div>';
+        }
+    }
 
     foreach($menu as $key => $value){
         echo '<section class="bcChoix"><h3>', $h3[$key], '</h3>';
-        if (!estAuthentifie() || ($compdate>0) || (estAuthentifie()&& !$choixFait && $compdate<0)){
+        if (estAuthentifie() && $choixFait){
+            foreach ($value as $p){
+                affPlatLChecked($p, $choix, $key);
+            }
+        }
+        if($isForm){
+            affChoixNull($key);
+            foreach($value as $p){
+                affPlatFormL($p, $key);
+            }
+        }
+        //if (!estAuthentifie() || ($compdate>0) || (estAuthentifie()&& !$choixFait && $compdate<0)){
+        else{
             foreach ($value as $p) {
                 affPlatL($p, $key);
             }
         }
-        if (estAuthentifie() && $choixFait){
-            foreach ($value as $p){
-                affPlatLChecked($p,$choix,$key);
-            }
-        }
         echo '</section>';
+    }
+
+    if($isForm){
+        affSupplEtBoutons();
+        echo '</form>';
     }
 
     // affichage des commentaires
     if($compdate < 1){
         affComs(getCom($date), getMoy($date));
     }
+}
+
+//_______________________________________________________________
+/**
+ * Insère dans la base de donnees la commande passée par l'utilisateur
+ * 
+ * @return array    le tableau d'erreurs si ily en a 
+ */
+function verifCommande(): array {
+    $errs = [];
+    return $errs;
+    /* Toutes les erreurs détectées qui nécessitent une modification du code HTML sont considérées comme des tentatives de piratage 
+    et donc entraînent l'appel de la fonction sessionExit() */
+
+    if( !parametresControle('post', [''])) {
+        sessionExit();   
+    }
+}
+
+//_______________________________________________________________
+/**
+ * Insère dans la base de donnees la commande passée par l'utilisateur
+ *
+ * @return void
+ */
+function addCommande() {
+    $ID = $_SESSION['usID'];
+    $date = DATE_AUJOURDHUI;
+
+    // ouverture de la connexion à la base 
+    $bd = bdConnect();
+
+    foreach($_POST as $cle => $valeur){
+        if($valeur == "0" || $cle == "btnCommander" || $cle == "nbPains" || $cle == "nbServiettes"){
+            continue;
+        }
+
+        $nbPortions = 1.0;
+        if($_POST['radPlats'] == "0"){ // PB les accompagnements on une portion de 1,5 
+                                       // si aucun plat choisi
+
+        }
+        if($valeur = "38"){
+            $nbPortions = floatval($_POST['nbPains']);
+        }else if($valeur = "39"){
+            $nbPortions = floatval($_POST['nbServiettes']);
+        }
+        
+        $sql = "INSERT INTO repas
+                VALUES (reDate=$date, rePlat=$valeur, reUsager=$ID, reNbPortions=$nbPortions)";
+        $res = bdSendRequest($bd, $sql);
+
+        while($tab = mysqli_fetch_assoc($res)) {
+
+        }
+        mysqli_free_result($res);
+    }
+
+    // fermeture de la connexion à la base de données
+    mysqli_close($bd);
+}
+
+//_______________________________________________________________
+/**
+ * Génère le bouton pour ne pas choisir de plat, d'entree etc...
+ *
+ * @param string    $curr      la categorie d'affichage actuelle
+ * 
+ * @return void
+ */
+function affChoixNull(string $curr){
+    if($curr == "accompagnements" || $curr == "boissons"){
+        return;
+    }
+
+    $checked = (isset($_POST['btnCommander']) && $_POST["rad$curr"] == "0") ? "checked" : "";
+
+    echo 
+        '<input id="rad', $curr, '" name="rad', $curr, '" type="radio" value="aucune" ', $checked,'>',
+        '<label for="rad', $curr, '">'
+    ;
+    switch ($curr){
+        case 'entrees':
+            echo '<img src="../images/repas/0.jpg" alt="Pas d\'entrée" title="Pas d\'entrée">Pas d\'entrée';
+            break;
+        case 'plats':
+            echo '<img src="../images/repas/0.jpg" alt="Pas de plat" title="Pas de plat">Pas de plat';
+            break;
+        case 'desserts':
+            echo '<img src="../images/repas/0.jpg" alt="Pas de fromage/dessert" title="Pas de fromage/dessert">Pas de fromage/dessert';
+            break;
+    }
+    echo '</label>';
+}
+
+//_______________________________________________________________
+/**
+ * Génère les suppléments et les boutons d'envoi et de reset
+ *
+ * @return void
+ */
+function affSupplEtBoutons(){
+    $nbPains = (isset($_POST['btnCommander'])) ? $_POST['nbPains'] : "0";
+    $nbServiettes = (isset($_POST['btnCommander'])) ? $_POST['nbServiettes'] : "1";
+
+    echo 
+        '<section class="bcChoix">',
+            '<h3>Suppléments</h3>',
+            '<label>',
+                '<img src="../images/repas/38.jpg" alt="Pain" title="Pain">Pain',
+                '<input type="number" min="0" max="2" name="nbPains" value="', $nbPains,'">',
+            '</label>',
+            '<label>',
+                '<img src="../images/repas/39.jpg" alt="Serviette en papier" title="Serviette en papier">Serviette en papier',
+                '<input type="number" min="1" max="5" name="nbServiettes" value="', $nbServiettes,'">',
+            '</label>',
+        '</section>',
+        '<section>',
+            '<h3>Validation</h3>',
+                '<p class="attention">',
+                    '<img src="../images/attention.png" alt="attention" width="50" height="50">',
+                    'Attention, une fois la commande réalisée, il n\'est pas possible de la modifier.<br>',
+                    'Toute commande non-récupérée sera majorée d\'une somme forfaitaire de 10 euros.',
+                '</p>',
+                '<p class="center">',
+                    '<input type="submit" name="btnCommander" value="Commander">',
+                    '<input type="reset" name="btnAnnuler" value="Annuler">',
+                '</p>',
+        '</section>'
+    ;
 }
 
 //_______________________________________________________________
