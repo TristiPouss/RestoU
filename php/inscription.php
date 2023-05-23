@@ -253,6 +253,7 @@ function traitementInscriptionL(): array {
     // cette variable de session permet de savoir si l'utilisateur est authentifié
     // mysqli_insert_id() retourne la valeur générée pour une colonne AUTO_INCREMENT par la dernière requête
     $_SESSION['usID'] = mysqli_insert_id($bd);
+    $_SESSION['noTentative'] = 0;
 
     // fermeture de la connexion à la base de données
     mysqli_close($bd);

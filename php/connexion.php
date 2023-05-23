@@ -194,6 +194,8 @@ function traitementConnexionL(): bool {
     // Rappel : ici, elle ne rajoutera jamais d'antislash car le login ne peut contenir que des caractères alphanumériques
     $_SESSION['usLogin'] = $login;
 
+    $_SESSION['noTentative'] = 0;
+
     // redirection vers la page précédente
     if(isset($_SESSION['back'])){
         header('Location: ' . $_SESSION['back']);

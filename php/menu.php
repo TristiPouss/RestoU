@@ -25,8 +25,6 @@ if(isset($_POST['btnCommander'])){
     $erreurs = null;
 }
 
-var_dump($_POST);
-
 // contenu de la page 
 affContenuL($erreurs);
 
@@ -244,21 +242,21 @@ function getChoixUser(int $date, array &$choix) : bool {
     while ($tab = mysqli_fetch_assoc($res)) {
         switch ($tab['plCategorie']) {
             case 'entree':
-                $choix['entrees'][] = $tab;
+                $choix['entrees'] = $tab['rePlat'];
                 break;
             case 'viande':
             case 'poisson':
-                $choix['plats'][] = $tab;
+                $choix['plats'] = $tab['rePlat'];
                 break;
             case 'accompagnement':
-                $choix['accompagnements'][] = $tab;
+                $choix['accompagnements'][] = $tab['rePlat'];
                 break;
             case 'dessert':
             case 'fromage':
-                $choix['desserts'][] = $tab;
+                $choix['desserts'] = $tab['rePlat'];
                 break;
             default:
-                $menu['boissons'][] = $tab;
+                $choix['boissons'] = $tab['rePlat'];
         }
     }
     // libération des ressources
@@ -319,11 +317,21 @@ function affPlatLChecked(array $p, array $choix,string $catAff): void {
         $id = $name = "cb{$p['plID']}";
         $type = 'checkbox';
     }
-
     // protection des sorties contre les attaques XSS    
     $p['plNom'] = htmlProtegerSorties($p['plNom']);
 
-    $checked = ($choix[$catAff] == $p['plID']) ? "checked" : "";
+    if($catAff != 'accompagnements'){
+        $checked = ($choix[$catAff] == $p['plID']) ? "checked" : "";
+    } else {
+        $isChecked = false;
+        for($i = 0; $i<sizeof($choix[$catAff]); $i++){
+            if($choix[$catAff][$i] == $p['plID']){
+                $isChecked = true;
+            }
+        }
+        $checked = ($isChecked) ? "checked" : "";
+    }
+
 
     echo    '<input id="', $id, '" name="', $name, '" type="', $type, '" value="', $p['plID'], '" disabled ',$checked,'>',
             '<label for="', $id,'">',
@@ -356,7 +364,7 @@ function affPlatFormL(array $p, string $catAff): void {
     // protection des sorties contre les attaques XSS
     $p['plNom'] = htmlProtegerSorties($p['plNom']);
 
-    $checked = (isset($_POST['btnCommander']) && $_POST[$name] == $p['plID']) ? "checked" : "";
+    $checked = (isset($_POST[$name]) && $_POST[$name] == $p['plID']) ? "checked" : "";
 
     echo    '<input id="', $id, '" name="', $name, '" type="', $type, '" value="', $p['plID'], '" ',$checked,'>',
             '<label for="', $id,'">',
@@ -391,9 +399,12 @@ function affContenuL(?array $erreurs): void {
     // Génération de la navigation entre les dates 
     affNavigationDateL($date);
 
-    if(isset($_POST['btnCommander']) && $erreurs == null){
-        //addCommande();
+    if(isset($_SESSION['valide']) && $_SESSION['valide']){
         echo '<div class="valid">La commande à été enregistrée avec succès.</div>';
+        unset($_SESSION['valide']);
+    }
+    if(isset($_POST['btnCommander']) && empty($erreurs)){
+        addCommande();
     }
 
     // menu du jour
@@ -421,7 +432,7 @@ function affContenuL(?array $erreurs): void {
     
     // affichage du menu
     $compdate = compareDate($date,DATE_AUJOURDHUI);
-    $isForm = estAuthentifie() && !$choixFait && $compdate >= 0;
+    $isForm = estAuthentifie() && !$choixFait && $compdate == 0;
 
     if($isForm){
         echo 
@@ -432,7 +443,7 @@ function affContenuL(?array $erreurs): void {
             '<form method="POST" action="menu.php">'
         ;
 
-        if (is_array($erreurs)) {
+        if (is_array($erreurs) && !empty($erreurs)) {
             echo    '<div class="error">Les erreurs suivantes ont été relevées lors de votre inscription :',
                         '<ul>';
             foreach ($erreurs as $e) {
@@ -442,15 +453,15 @@ function affContenuL(?array $erreurs): void {
                     '</div>';
         }
     }
-
+    $i = 0;
     foreach($menu as $key => $value){
         echo '<section class="bcChoix"><h3>', $h3[$key], '</h3>';
         if (estAuthentifie() && $choixFait){
             foreach ($value as $p){
-                affPlatLChecked($p, $choix, $key);
+                affPlatLChecked($p, $choix, $key, $i);
             }
         }
-        if($isForm){
+        else if($isForm){
             affChoixNull($key);
             foreach($value as $p){
                 affPlatFormL($p, $key);
@@ -483,14 +494,54 @@ function affContenuL(?array $erreurs): void {
  * @return array    le tableau d'erreurs si ily en a 
  */
 function verifCommande(): array {
+    $_SESSION['noTentative']++;
+
     $errs = [];
-    return $errs;
+
+    $date = dateConsulteeL();
+    $menu = [];
+    bdMenuL($date, $menu); 
+
+    $paramObligatoires = [];
+    $ctrlOK = false;
+
+    foreach($menu['accompagnements'] as $acc){
+        if(isset($_POST["cb".$acc['plID']])){
+            array_push($paramObligatoires, "cb".$acc['plID']);
+            $ctrlOK = true;
+        }
+    }
+
     /* Toutes les erreurs détectées qui nécessitent une modification du code HTML sont considérées comme des tentatives de piratage 
     et donc entraînent l'appel de la fonction sessionExit() */
-
-    if( !parametresControle('post', [''])) {
+    array_push($paramObligatoires, 'radboissons', 'nbPains', 'nbServiettes', 'btnCommander', 'radentrees', 'radplats', 'raddesserts');
+    if($_SESSION['noTentative'] > 2 && (!$ctrlOK || !parametresControle('post', $paramObligatoires))) {
         sessionExit();   
     }
+
+    if(!isset($_POST['radentrees'])){
+        array_push($errs, "Aucune entrée choisie");
+    }
+    if(!isset($_POST['radplats'])){
+        array_push($errs, "Aucun plat choisi");
+    }
+    if(!$ctrlOK){
+        array_push($errs, "Aucun accompagnement choisi");
+    }
+    if(!isset($_POST['radboissons'])){
+        array_push($errs, "Aucune boisson choisie");
+    }
+    if(!isset($_POST['raddesserts'])){
+        array_push($errs, "Aucun fromage/dessert choisi");
+    }
+    if($_POST['nbPains']<0 || $_POST['nbPains']>2){
+        array_push($errs, "Erreur dans le nombre de pains");
+    }
+    if($_POST['nbServiettes']<1 || $_POST['nbServiettes']>5){
+        array_push($errs, "Erreur dans le nombre de serviettes");
+    }
+
+    return $errs;
 }
 
 //_______________________________________________________________
@@ -507,33 +558,42 @@ function addCommande() {
     $bd = bdConnect();
 
     foreach($_POST as $cle => $valeur){
-        if($valeur == "0" || $cle == "btnCommander" || $cle == "nbPains" || $cle == "nbServiettes"){
+        if($valeur == "aucune" || $cle == "btnCommander"){
             continue;
         }
 
         $nbPortions = 1.0;
-        if($_POST['radPlats'] == "0"){ // PB les accompagnements on une portion de 1,5 
-                                       // si aucun plat choisi
-
+        if($_POST['radplats'] == "aucune" && preg_match('/^cb[0-9]+$/', $cle)){ 
+            // les accompagnements on une portion de 1,5 si aucun plat choisi
+            $nbPortions = 1.5;
         }
-        if($valeur = "38"){
+        if($cle == "nbPains"){
+            $valeur = "38";
             $nbPortions = floatval($_POST['nbPains']);
-        }else if($valeur = "39"){
+        }
+        if($cle == "nbServiettes"){
+            $valeur = "39";
             $nbPortions = floatval($_POST['nbServiettes']);
         }
-        
-        $sql = "INSERT INTO repas
-                VALUES (reDate=$date, rePlat=$valeur, reUsager=$ID, reNbPortions=$nbPortions)";
-        $res = bdSendRequest($bd, $sql);
 
-        while($tab = mysqli_fetch_assoc($res)) {
-
+        if($nbPortions == 0){
+            continue;
         }
-        mysqli_free_result($res);
+        
+        $valeur_p = mysqli_real_escape_string($bd, $valeur);
+
+        $sql = "INSERT INTO repas (reDate, rePLat, reUsager, reNbPortions)
+                VALUES ('$date', $valeur_p, $ID, $nbPortions)";
+
+        $res = bdSendRequest($bd, $sql);
     }
 
     // fermeture de la connexion à la base de données
     mysqli_close($bd);
+
+    $_POST = [];
+    $_SESSION['valide'] = true;
+    header("refresh: 0");
 }
 
 //_______________________________________________________________
@@ -549,7 +609,7 @@ function affChoixNull(string $curr){
         return;
     }
 
-    $checked = (isset($_POST['btnCommander']) && $_POST["rad$curr"] == "0") ? "checked" : "";
+    $checked = (isset($_POST["rad$curr"]) && $_POST["rad$curr"] == "0") ? "checked" : "";
 
     echo 
         '<input id="rad', $curr, '" name="rad', $curr, '" type="radio" value="aucune" ', $checked,'>',
