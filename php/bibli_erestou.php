@@ -81,13 +81,21 @@ function affEntete(string $titre, string $css = 'eResto.css', string $prefixe = 
  */
 function affNav(string $prefixe = '..'): void {
     $login = estAuthentifie() ? htmlProtegerSorties($_SESSION['usLogin']) : null;
+    $profil = (isset($_SESSION['profil']) && $_SESSION['profil']);
     echo '<nav>',
             '<ul>',
                 '<li><a href="', $prefixe, '/index.php"><span>&#x2630;</span> Accueil</a></li>',
-                '<li><a href="', $prefixe, '/php/menu.php"><span>&#x2630;</span> Menus et repas</a></li>',
-                $login !== null ?
-                "<li><a href='{$prefixe}/php/deconnexion.php'><span>&#x2630;</span> Déconnexion [{$login}]</a></li>" :
-                "<li><a href='{$prefixe}/php/connexion.php'><span>&#x2630;</span> Connexion</a></li>",
+                '<li><a href="', $prefixe, '/php/menu.php"><span>&#x2630;</span> Menus et repas</a></li>';
+                if($login !== null){
+                    if($profil){
+                        echo "<li><a href='{$prefixe}/php/deconnexion.php'><span>&#x2630;</span> Déconnexion [{$login}]</a></li>";
+                    }else{
+                        echo "<li><a href='{$prefixe}/php/profil.php'><span>&#x2630;</span> Profil [{$login}]</a></li>";
+                    }
+                }else{
+                    echo "<li><a href='{$prefixe}/php/connexion.php'><span>&#x2630;</span> Connexion</a></li>";
+                }
+    echo
             '</ul>',
         '</nav>',
         '<main>';

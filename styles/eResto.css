@@ -604,3 +604,41 @@ form input[type=text], form input[type=email], form input[type=password] {
     padding: 5px;
     line-height: 1.5;
 }
+
+/* Profil */
+
+.profile{
+    display: block;
+    width: 90%;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.title{
+    display: block;
+    width: 100%;
+}
+
+.profile .infoUser .statUser {
+    display: inline-block;
+    border-radius: 10px;
+    vertical-align: middle;
+    width: 50%;
+    padding: 1rem;
+}
+
+.title h4{
+    display: inline-block;
+    width: 50%;
+    vertical-align: middle;
+}
+
+.infoUser{
+    display: inline-block;
+    width: 50%;
+}
+
+.statUser{
+    display: inline-block;
+    width: 50%;
+}

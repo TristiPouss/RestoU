@@ -15,6 +15,8 @@ ob_start();
 // démarrage ou reprise de la session
 session_start();
 
+$_SESSION['profil'] = false;
+
 /*------------------------- Etape 1 --------------------------------------------
 - vérifications diverses et traitement des soumissions
 ------------------------------------------------------------------------------*/

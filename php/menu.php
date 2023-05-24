@@ -11,6 +11,7 @@ ob_start();
 session_start();
 
 $_SESSION['back'] = $_SERVER['REQUEST_URI'];
+$_SESSION['profil'] = false;
 
 // affichage de l'entête
 affEntete('Menus et repas');
@@ -554,9 +555,16 @@ function addCommande() {
     $ID = $_SESSION['usID'];
     $date = DATE_AUJOURDHUI;
 
+    $noAccomp = 0;
+    foreach($_POST as $cle => $valeur){
+        if(preg_match('/^cb[0-9]+$/', $cle)){
+            $noAccomp++;
+        }
+    }
+
     // ouverture de la connexion à la base 
     $bd = bdConnect();
-
+    
     foreach($_POST as $cle => $valeur){
         if($valeur == "aucune" || $cle == "btnCommander"){
             continue;
@@ -565,7 +573,7 @@ function addCommande() {
         $nbPortions = 1.0;
         if($_POST['radplats'] == "aucune" && preg_match('/^cb[0-9]+$/', $cle)){ 
             // les accompagnements on une portion de 1,5 si aucun plat choisi
-            $nbPortions = 1.5;
+            $nbPortions = 1.5 / $noAccomp;
         }
         if($cle == "nbPains"){
             $valeur = "38";

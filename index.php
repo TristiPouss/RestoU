@@ -10,6 +10,7 @@ ob_start();
 session_start();
 
 $_SESSION['back'] = $_SERVER['REQUEST_URI'];
+$_SESSION['profil'] = false;
 
 // génération de l'entête 
 affEntete('Accueil', prefixe:'.');
