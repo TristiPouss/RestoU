@@ -885,7 +885,7 @@ function getCom(int $date): array {
 
     $sql = "SELECT usID, coDateRepas, coTexte, coDatePublication, coNote, usNom, usPrenom
             FROM commentaire INNER JOIN usager ON coUsager = usID 
-            WHERE coDateRepas = '{$date}' ORDER BY coDateRepas DESC";
+            WHERE coDateRepas = '{$date}' ORDER BY coDatePublication DESC";
     $res = bdSendRequest($bd, $sql);
 
     while($tab = mysqli_fetch_assoc($res)) {
@@ -978,7 +978,7 @@ function addCom(string $date, string $texte, string $note) {
     // proteger entrees
     $texte = mysqli_real_escape_string($bd, $texte);
     $note = mysqli_real_escape_string($bd, $note);
-    $datePubli = DATE_AUJOURDHUI + HEURE_COURANTE;
+    $datePubli = date('YmdHi');
 
     $sql = "INSERT INTO commentaire 
             VALUES ('{$date}', '{$_SESSION['usID']}', '{$texte}', '{$datePubli}', '{$note}')";
@@ -1061,18 +1061,12 @@ function traitementEditCom(int $date) : array {
     $errs = [];
 
     $com = trim($_POST['com']);
-    $com = htmlspecialchars($com, ENT_QUOTES, 'UTF-8');
     
     if(strlen($com)==0){
         $errs[] = "Du texte doit être renseigné";
     }
-    if(strlen($com)>1000){
-        $errs[] = "Le commentaire doit avoir moins de 1000 caractères";
-    }
+    verifierTexte($com, 'Le commentaire', $errs, 1000);
 
-    if(empty($_POST['note'])){
-        $errs[] = "Une note doit être donnée";
-    }
     $note = intval($_POST['note']);
     if($note<0 || $note>5){
         sessionExit(); // Valeur impossible en théorie;
@@ -1084,28 +1078,3 @@ function traitementEditCom(int $date) : array {
 
     updateCom($date, $com, $note);
 }
-/* Indications sur les commentaires
-
-Chaque commentaire est associé à un repas pris par un utilisateur : 
-pour pouvoir commenter un menu, il faut l'avoir préalablement commandé.
-
-Un commentaire est constitué d'un texte et d'une note entière sur 5, 
-
-et peut être illustré par une image uploadée sur le serveur. 
-Celle-ci est donc située dans un dossier particulier nommé upload, 
-et est nommée à partir de la date du repas pris et commenté 
-(champ "coDateRepas" de la table commentaire) et de l'identifiant de l'usager auteur 
-du commentaire (champ "coUsager" de la table commentaire), au format coDateRepas_coUsager.jpg. 
-Par exemple, l'image illustrant le commentaire du repas pris par l'usager, d'identifiant 2, le 7 mars 2023 est nommée 20230307_2.jpg.
-
-La page menu.php doit permettre de visualiser les éventuels commentaires portant sur ce menu (cf. TP2). 
-Si la date consultée est antérieure ou égale à la date courante ou actuelle (et uniquement dans ce cas), 
-et qu'il n'y a pas de commentaires portant sur ce menu, un message doit l'indiquer.
-N.B. : les menus des dates postérieures à la date actuelle ne peuvent pas, 
-par définition, avoir été déjà commandés. Donc, ils ne peuvent pas avoir été déjà commentés. 
-Par conséquent, dans ce cas, il ne faut pas afficher un message indiquant que le menu n'a pas été commenté.
-
-Les commentaires d'un repas sont affichés du plus récent au plus ancien.
-
-S'il y a un ou plusieurs commentaires, un message informe de la note moyenne donnée dans les commentaires, 
-arrondie au dixième, et indique le nombre de commentaires.*/
