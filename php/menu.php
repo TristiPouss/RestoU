@@ -845,7 +845,7 @@ function affComs(array $liCom, float $moyenne, bool $choixFait): void {
                 '</div>',
                 '<input type="submit" name="cancelAdd" value="Annuler">';                
         }else{
-            echo '<input type="submit" name="addCom" value="Ajouter un commentaire">';
+            echo '<input type="submit" name="addCom" value="Ajouter com.">';
         }
         echo '</form>';
     }
