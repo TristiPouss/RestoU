@@ -22,6 +22,7 @@ define ('BD_SERVER', 'localhost');
 date_default_timezone_set('Europe/Paris');
 
 define ('DATE_AUJOURDHUI', date('Ymd'));
+define ('HEURE_COURANTE', date('Hi'));
 define ('ANNEE_MAX', intdiv(DATE_AUJOURDHUI, 10000));
 define ('ANNEE_MIN', ANNEE_MAX - 1);
 

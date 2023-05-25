@@ -413,7 +413,7 @@ form {
      margin: 20px 0;
 }
 
-form input[type=submit], form input[type=reset], form input[type=button] {
+form input[type=submit], form input[type=reset], form input[type=button]{
     color: black;
     background-color: lightgrey;
     border: solid 2px black;
@@ -425,6 +425,7 @@ form input[type=submit], form input[type=reset], form input[type=button] {
     font-size: 14px;
     cursor: pointer;
 }
+
 form input[type=submit]:hover, form input[type=reset]:hover, form input[type=button]:hover {
     color: white;
     background-color: red;
@@ -641,4 +642,60 @@ form input[type=text], form input[type=email], form input[type=password] {
 .statUser{
     display: inline-block;
     width: 50%;
+}
+
+/* Cache */
+
+#goModal {
+	position: fixed;
+	left: 0;
+	top: 0;
+	right: 0;
+	bottom: 0;
+	background: rgba(0, 0, 0, 0.4);
+    pointer-events: none;
+    opacity: 0;
+}
+
+#goModal:target {
+    pointer-events: all;
+    opacity: 1;
+}
+
+#modal_content {
+    position: fixed;
+	width: 200px;
+	height: 100px;
+	left: 0;
+	top: 0;
+	right: 0;
+	bottom: 0;
+	margin: auto;
+	z-index: 2;
+	background: white;
+    border-radius: 10px;
+}
+
+#modal_content > p {
+    position:relative;
+    left: 15px;
+}
+
+#modal_content input a{
+    position:relative;
+    left: 28px;
+    margin-top: 2px;
+}
+
+.bout{
+    color: black;
+    background-color: lightgrey;
+    border: solid 2px black;
+    border-radius: 5px;
+    padding: 5px;
+    margin: 0 10px;
+    font-weight: bold;
+    width: 120px;
+    font-size: 14px;
+    cursor: pointer;
 }

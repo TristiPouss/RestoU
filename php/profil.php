@@ -44,6 +44,7 @@ ob_end_flush();
 function affContenuL(?array $err){
     $infoUser = getInfoUser();
 
+    //Stats
     $nbRepas = intval($infoUser['nbRepas']);
     $nbRepasCom = intval($infoUser['nbRepasCom']);
     $pourcentRepasCom = 0;

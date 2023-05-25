@@ -20,10 +20,14 @@ affEntete('Menus et repas');
 affNav();
 
 // enregistrement de la commande si elle existe
+$erreurs = null;
 if(isset($_POST['btnCommander'])){
     $erreurs = verifCommande();
-} else {
-    $erreurs = null;
+}
+
+$erreursCom = null;
+if(isset($_POST['validateCom'])){
+    $erreursCom = verifCommentaire();
 }
 
 // contenu de la page 
@@ -397,6 +401,19 @@ function affContenuL(?array $erreurs): void {
     }
     // si on arrive à ce point de l'exécution, alors la date est valide
     
+    if(isset($_POST['deleteCom'])){
+        delCom($date);
+        unset($_POST['deleteCom']);
+    }
+
+    if(isset($_POST['validateAdd'])){
+        traitementAddCom();
+    }
+
+    if(isset($_POST['validateEdit'])){
+        traitementEditCom();
+    }
+
     // Génération de la navigation entre les dates 
     affNavigationDateL($date);
 
@@ -468,7 +485,6 @@ function affContenuL(?array $erreurs): void {
                 affPlatFormL($p, $key);
             }
         }
-        //if (!estAuthentifie() || ($compdate>0) || (estAuthentifie()&& !$choixFait && $compdate<0)){
         else{
             foreach ($value as $p) {
                 affPlatL($p, $key);
@@ -484,7 +500,7 @@ function affContenuL(?array $erreurs): void {
 
     // affichage des commentaires
     if($compdate < 1){
-        affComs(getCom($date), getMoy($date));
+        affComs(getCom($date), getMoy($date), $choixFait);
     }
 }
 
@@ -680,7 +696,7 @@ function affSupplEtBoutons(){
  * 
  * @param ID        l'Identifiant de la personne ayant commenté
  * @param dateRepas la date du repas
- * @param com       la chaine du commentaire
+ * @param com       la chaine du commentaire deja protegee
  * @param nom       le nom de l'usager ayant commenté
  * @param prenom    le prenom de l'usager ayant commenté
  * @param date      la date formatté de la publication du commentaire
@@ -695,12 +711,42 @@ function affCom(string $ID, string $dateRepas, string $com, string $nom, string 
     $min = substr($date, -2);
     $heure = substr($date, -4, -2);
 
+    if(isset($_SESSION['usID']) && $_SESSION['usID']==$ID){
+        $edit = isset($_POST['editCom']);
+        if(isset($_POST['cancelEdit'])){
+            $edit = false;
+        }
+        //Bouton d'edition
+        echo '<form id="editCom" method="POST" action="',$_SERVER['REQUEST_URI'],'#editCom">';
+        if($edit){
+            // Formulaire d'edition de commentaire
+            echo '<label for="com">Commentaire : </label>',
+                 '<br>',
+                 '<textarea id="com" cols = "50" rows = "5" name = "com">',$com,'</textarea>',
+                 '<br>',
+                 '<label for="note">Note : </label>',
+            affListeNombre("note", 0, 5, 1, $note);
+            echo '<br><br>',
+                '<a href="#goModal" class="bout">Valider</a>',
+                '<div id="goModal">',
+                    '<div id="modal_content">',
+                        '<p>Editer le commentaire ?</p>',
+                        '<input type="submit" name="validateEdit" value="Valider">',
+                        '<a href="#editCom" class="bout">Retour</a>',
+                    '</div>',
+                '</div>',
+                '<input type="submit" name="cancelEdit" value="Annuler">';
+        }else{
+            echo '<input type="submit" name="editCom" value="Editer">';
+            echo '<input type="submit" name="deleteCom" value="Supprimer">';
+        }
+        echo '</form>';
+    }
+
     echo
     '<article>';
     if(file_exists($src)){
-        echo
-        '<img alt="screenshotRepas" src="'.$src.'">'
-        ;
+        echo '<img alt="screenshotRepas" src="'.$src.'">';
     }
     echo
         '<p><strong>Commentaire de '.$prenom.' '.$nom.', publié le '.$jour.' '.moisStr($mois).' '.$annee.' à '.$heure.':'.$min.'</strong><p>',
@@ -714,20 +760,28 @@ function affCom(string $ID, string $dateRepas, string $com, string $nom, string 
 /**
  * Génère tous les commentaires.
  * 
- * @param liCom     liste des commentaires sous la forme
- *                  d'un tableau de tableaux de commentaires 
- *                  Exemple :
- *                      $liCom[0] = {
- *                          'com' = le commentaire,
- *                          'nom' = le nom
- *                           etc... (cf fonction affCom)             
- *                      }
- * @param moyenne   moyenne des commentaires
+ * @param array $liCom        liste des commentaires sous la forme
+ *                            d'un tableau de tableaux de commentaires 
+ *                            Exemple :
+ *                            $liCom[0] = {
+ *                             'com' = le commentaire,
+ *                             'nom' = le nom
+ *                              etc... (cf fonction affCom)             
+ *                            }
+ * @param float $moyenne      moyenne des commentaires
+ * @param bool  $choixFait    indique si l'utilisateur a passé commande  
  *
  * @return void
  */
-function affComs(array $liCom, float $moyenne): void {
+function affComs(array $liCom, float $moyenne, bool $choixFait): void {
     $size = sizeof($liCom);
+
+    $afficherAddComButton = true;
+    foreach($liCom as $commentaire){
+        if(!$choixFait && isset($_SESSION['usID']) && $commentaire['ID'] == $_SESSION['usID']){
+            $afficherAddComButton = false;
+        }
+    }
     
     if (floor($moyenne) == $moyenne){
         $moyenne = number_format($moyenne, 0);
@@ -743,6 +797,39 @@ function affComs(array $liCom, float $moyenne): void {
         echo '<p>Note moyenne de ce menu : '.$moyenne.' / 5 sur la base de '.$size.' commentaire';
         if($size > 1){echo 's';}
         echo '</p>';
+    }
+    //Ajout de commentaire    
+    if($afficherAddComButton){
+        $add = isset($_POST['addCom']);
+        if(isset($_POST['cancelAdd'])){
+            $add = false;
+        }
+        //Bouton d'ajout
+        echo '<form id="addCom" method="POST" action="',$_SERVER['REQUEST_URI'],'#addCom">';
+        if($add){
+            echo '<label for="com">Commentaire : </label>',
+                 '<br>',
+                 '<textarea id="com" cols = "50" rows = "5" name = "com"></textarea>',
+                 '<br>',
+                 '<label for="note">Note : </label>',
+            affListeNombre("note", 0, 5, 1, -1);
+            echo '<br><br>',
+                '<a href="#goModal" class="bout">Valider</a>',
+                '<div id="goModal">',
+                    '<div id="modal_content">',
+                        '<p>Ajouter le commentaire ?</p>',
+                        '<input type="submit" name="validateAdd" value="Valider">',
+                        '<a href="#editCom" class="bout">Retour</a>',
+                    '</div>',
+                '</div>',
+                '<input type="submit" name="cancelAdd" value="Annuler">';                
+        }else{
+            echo '<input type="submit" name="addCom" value="Ajouter un commentaire">';
+        }
+        echo '</form>';
+    }
+
+    if($size > 0){
         foreach($liCom as $commentaire){
             // on protege seulement le texte du commentaire, 
             // le reste a soit deja ete verifie soit est issu de la BD
@@ -831,6 +918,115 @@ function getMoy(int $date): float {
     return $moy;
 }
 
+//_______________________________________________________________
+/**
+ * Supprime un commentaire
+ * 
+ * @param int   $date      la date du commentaire sous forme 
+ *                         d'entier au format AAAAMMJJ
+ * 
+ */
+function delCom(int $date) {
+    // ouverture de la connexion à la base 
+    $bd = bdConnect();
+
+    $sql = "DELETE FROM commentaire
+            WHERE coDateRepas = '{$date}' AND 
+                  coUsager = '{$_SESSION['usID']}'";
+    $res = bdSendRequest($bd, $sql);
+
+    // fermeture de la connexion à la base de données
+    mysqli_close($bd);
+
+    header('Location: menu.php');
+}
+
+//_______________________________________________________________
+/**
+ * Ajoute un commentaire
+ * 
+ * @param string     $date      la date du commentaire, format AAAAMMJJ
+ * @param string     $texte     le texte du commentaire
+ * @param string     $note      la note sur cinq donnée au repas
+ * 
+ */
+function addCom(string $date, string $texte, string $note): float {
+    // ouverture de la connexion à la base 
+    $bd = bdConnect();
+
+    // proteger entrees
+    $texte = mysqli_real_escape_string($bd, $texte);
+    $note = mysqli_real_escape_string($bd, $note);
+    $datePubli = DATE_AUJOURDHUI + HEURE_COURANTE;
+
+    $sql = "INSERT INTO commentaire 
+            VALUES ('{$date}', '{$_SESSION['usID']}', '{$texte}', '{$datePubli}', '{$note}')";
+    $res = bdSendRequest($bd, $sql);
+
+    // fermeture de la connexion à la base de données
+    mysqli_close($bd);
+
+    header('Location: menu.php');
+}
+
+//_______________________________________________________________
+/**
+ * Modifie un commentaire
+ * 
+ * @param int        $date      la date du commentaire sous forme d'entier au format AAAAMMJJ
+ * @param string     $texte     le texte du commentaire
+ * @param string     $note      la note sur cinq donnée au repas
+ * 
+ */
+function updateCom(int $date, string $texte, string $note): float {
+    // ouverture de la connexion à la base 
+    $bd = bdConnect();
+
+    // proteger entrees
+    $texte = mysqli_real_escape_string($bd, $texte);
+    $note = mysqli_real_escape_string($bd, $note);
+    $datePubli = DATE_AUJOURDHUI + HEURE_COURANTE;
+
+    $sql = "UPDATE commentaire 
+            SET coTexte = '{$texte}', coDatePublication = '{$datePubli}', coNote = '{$note}'
+            WHERE coDateRepas = '{$date}' AND coUsager = '{$_SESSION['usID']}';";
+    $res = bdSendRequest($bd, $sql);
+
+    // fermeture de la connexion à la base de données
+    mysqli_close($bd);
+
+    header('Location: menu.php');
+}
+
+function traitementAddCom() : array {
+    /* Toutes les erreurs détectées qui nécessitent une modification du code HTML sont considérées comme des tentatives de piratage 
+    et donc entraînent l'appel de la fonction sessionExit() */
+
+    if( !parametresControle('post', ['com', 'note', 'validateAdd'])) {
+        sessionExit();   
+    }
+
+    $errs = [];
+
+    var_dump($_POST);
+
+    return $errs;
+}
+
+function traitementEditCom() : array {
+    /* Toutes les erreurs détectées qui nécessitent une modification du code HTML sont considérées comme des tentatives de piratage 
+    et donc entraînent l'appel de la fonction sessionExit() */
+
+    if( !parametresControle('post', ['com', 'note', 'validateEdit'])) {
+        sessionExit();   
+    }
+
+    $errs = [];
+
+    var_dump($_POST);
+
+    return $errs;
+}
 /* Indications sur les commentaires
 
 Chaque commentaire est associé à un repas pris par un utilisateur : 
