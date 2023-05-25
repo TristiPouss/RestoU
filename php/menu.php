@@ -403,15 +403,15 @@ function affContenuL(?array $erreurs): void {
     
     if(isset($_POST['deleteCom'])){
         delCom($date);
-        unset($_POST['deleteCom']);
     }
 
+    $erreursCom = null;
     if(isset($_POST['validateAdd'])){
-        traitementAddCom();
+        $erreursCom = traitementAddCom($date);
     }
 
     if(isset($_POST['validateEdit'])){
-        traitementEditCom();
+        $erreursCom = traitementEditCom($date);
     }
 
     // Génération de la navigation entre les dates 
@@ -500,6 +500,15 @@ function affContenuL(?array $erreurs): void {
 
     // affichage des commentaires
     if($compdate < 1){
+        if (is_array($erreursCom) && !empty($erreursCom)) {
+            echo    '<div class="error">Les erreurs suivantes ont été relevées lors de votre inscription :',
+                        '<ul>';
+            foreach ($erreursCom as $e) {
+                echo        '<li>', $e, '</li>';
+            }
+            echo        '</ul>',
+                    '</div>';
+        }
         affComs(getCom($date), getMoy($date), $choixFait);
     }
 }
@@ -726,6 +735,8 @@ function affCom(string $ID, string $dateRepas, string $com, string $nom, string 
                  '<br>',
                  '<label for="note">Note : </label>',
             affListeNombre("note", 0, 5, 1, $note);
+            echo '<label for="image">Image : </label>',
+                 '<input type="file", name="image" accept="image/*,.jpg"';
             echo '<br><br>',
                 '<a href="#goModal" class="bout">Valider</a>',
                 '<div id="goModal">',
@@ -737,8 +748,15 @@ function affCom(string $ID, string $dateRepas, string $com, string $nom, string 
                 '</div>',
                 '<input type="submit" name="cancelEdit" value="Annuler">';
         }else{
-            echo '<input type="submit" name="editCom" value="Editer">';
-            echo '<input type="submit" name="deleteCom" value="Supprimer">';
+            echo '<input type="submit" name="editCom" value="Editer">',
+                '<a href="#goModal" class="bout">Supprimer</a>',
+                '<div id="goModal">',
+                    '<div id="modal_content">',
+                        '<p>Supprimer le commentaire ?</p>',
+                        '<input type="submit" name="deleteCom" value="Supprimer">',
+                        '<a href="#editCom" class="bout">Retour</a>',
+                    '</div>',
+                '</div>';
         }
         echo '</form>';
     }
@@ -776,10 +794,11 @@ function affCom(string $ID, string $dateRepas, string $com, string $nom, string 
 function affComs(array $liCom, float $moyenne, bool $choixFait): void {
     $size = sizeof($liCom);
 
-    $afficherAddComButton = true;
+    $afficherAddComButton = $choixFait;
     foreach($liCom as $commentaire){
-        if(!$choixFait && isset($_SESSION['usID']) && $commentaire['ID'] == $_SESSION['usID']){
+        if(isset($_SESSION['usID']) && $commentaire['ID'] == $_SESSION['usID']){
             $afficherAddComButton = false;
+            break;
         }
     }
     
@@ -790,7 +809,7 @@ function affComs(array $liCom, float $moyenne, bool $choixFait): void {
     }
 
     echo 
-        '<div class="Commentaires">',
+        '<div id="com" class="Commentaires">',
         '<h4>Commentaires sur ce menu</h4>',
         '<br>';
     if($size > 0){
@@ -812,7 +831,9 @@ function affComs(array $liCom, float $moyenne, bool $choixFait): void {
                  '<textarea id="com" cols = "50" rows = "5" name = "com"></textarea>',
                  '<br>',
                  '<label for="note">Note : </label>',
-            affListeNombre("note", 0, 5, 1, -1);
+            affListeNombre("note", 0, 5, 1, 0);
+            echo '<label for="image">Image : </label>',
+                 '<input type="file", name="image" accept="image/*,.jpg"';
             echo '<br><br>',
                 '<a href="#goModal" class="bout">Valider</a>',
                 '<div id="goModal">',
@@ -938,7 +959,7 @@ function delCom(int $date) {
     // fermeture de la connexion à la base de données
     mysqli_close($bd);
 
-    header('Location: menu.php');
+    header('Location: '.$_SERVER['REQUEST_URI'].'#com');
 }
 
 //_______________________________________________________________
@@ -950,7 +971,7 @@ function delCom(int $date) {
  * @param string     $note      la note sur cinq donnée au repas
  * 
  */
-function addCom(string $date, string $texte, string $note): float {
+function addCom(string $date, string $texte, string $note) {
     // ouverture de la connexion à la base 
     $bd = bdConnect();
 
@@ -966,7 +987,7 @@ function addCom(string $date, string $texte, string $note): float {
     // fermeture de la connexion à la base de données
     mysqli_close($bd);
 
-    header('Location: menu.php');
+    header('Location: '.$_SERVER['REQUEST_URI'].'#com');
 }
 
 //_______________________________________________________________
@@ -978,14 +999,16 @@ function addCom(string $date, string $texte, string $note): float {
  * @param string     $note      la note sur cinq donnée au repas
  * 
  */
-function updateCom(int $date, string $texte, string $note): float {
+function updateCom(int $date, string $texte, string $note) {
     // ouverture de la connexion à la base 
     $bd = bdConnect();
 
     // proteger entrees
     $texte = mysqli_real_escape_string($bd, $texte);
     $note = mysqli_real_escape_string($bd, $note);
-    $datePubli = DATE_AUJOURDHUI + HEURE_COURANTE;
+    $datePubli = date('YmdHi');
+
+    var_dump($texte, $note, $datePubli, $date);
 
     $sql = "UPDATE commentaire 
             SET coTexte = '{$texte}', coDatePublication = '{$datePubli}', coNote = '{$note}'
@@ -995,37 +1018,71 @@ function updateCom(int $date, string $texte, string $note): float {
     // fermeture de la connexion à la base de données
     mysqli_close($bd);
 
-    header('Location: menu.php');
+    header('Location: '.$_SERVER['REQUEST_URI'].'#com');
 }
 
-function traitementAddCom() : array {
+function traitementAddCom(int $date) : array {
     /* Toutes les erreurs détectées qui nécessitent une modification du code HTML sont considérées comme des tentatives de piratage 
     et donc entraînent l'appel de la fonction sessionExit() */
 
-    if( !parametresControle('post', ['com', 'note', 'validateAdd'])) {
+    if( !parametresControle('post', ['com', 'note', 'validateAdd'], ['image'])) {
         sessionExit();   
     }
 
     $errs = [];
 
-    var_dump($_POST);
+    $com = trim($_POST['com']);
+    
+    if(strlen($com)==0){
+        $errs[] = "Du texte doit être renseigné";
+    }
+    verifierTexte($com, 'Le commentaire', $errs, 1000);
 
-    return $errs;
+    $note = intval($_POST['note']);
+    if($note<0 || $note>5){
+        sessionExit(); // Valeur impossible en théorie;
+    }
+
+    if(!empty($errs)){
+        return $errs;
+    }
+
+    addCom($date, $com, $note);
 }
 
-function traitementEditCom() : array {
+function traitementEditCom(int $date) : array {
     /* Toutes les erreurs détectées qui nécessitent une modification du code HTML sont considérées comme des tentatives de piratage 
     et donc entraînent l'appel de la fonction sessionExit() */
 
-    if( !parametresControle('post', ['com', 'note', 'validateEdit'])) {
+    if( !parametresControle('post', ['com', 'note', 'validateEdit'], ['image'])) {
         sessionExit();   
     }
 
     $errs = [];
 
-    var_dump($_POST);
+    $com = trim($_POST['com']);
+    $com = htmlspecialchars($com, ENT_QUOTES, 'UTF-8');
+    
+    if(strlen($com)==0){
+        $errs[] = "Du texte doit être renseigné";
+    }
+    if(strlen($com)>1000){
+        $errs[] = "Le commentaire doit avoir moins de 1000 caractères";
+    }
 
-    return $errs;
+    if(empty($_POST['note'])){
+        $errs[] = "Une note doit être donnée";
+    }
+    $note = intval($_POST['note']);
+    if($note<0 || $note>5){
+        sessionExit(); // Valeur impossible en théorie;
+    }
+
+    if(!empty($errs)){
+        return $errs;
+    }
+
+    updateCom($date, $com, $note);
 }
 /* Indications sur les commentaires
 

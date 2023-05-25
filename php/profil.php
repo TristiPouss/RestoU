@@ -48,8 +48,8 @@ function affContenuL(?array $err){
     $nbRepas = intval($infoUser['nbRepas']);
     $nbRepasCom = intval($infoUser['nbRepasCom']);
     $pourcentRepasCom = 0;
-    if($nbRepasCom != 0){ // evite la division par 0
-        $pourcentRepasCom =  $nbRepas / $nbRepasCom * 100;
+    if($nbRepas != 0){ // evite la division par 0
+        $pourcentRepasCom =  ($nbRepasCom / $nbRepas) * 100;
     }
     $calories = round($infoUser['moyCalories'], 1); 
     $carbone = round($infoUser['moyCarbone'], 1); 
